@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {ActivityIndicator, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, StyleSheet, Text, View, Alert} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createDrawerNavigator} from '@react-navigation/drawer';
 import TabScreen from './components/screens/TabScreen';
@@ -12,6 +12,8 @@ import {AuthContext} from './components/context';
 const Drawer = createDrawerNavigator();
 
 const App = () => {
+  const [user, setUser] = useState(null);
+
   const initialLoginState = {
     isLoading: true,
     userName: null,
@@ -48,30 +50,79 @@ const App = () => {
     initialLoginState,
   );
 
-  const authContext = React.useMemo(() => ({
-    signIn: async (userName, password) => {
-      let userToken;
-      userToken = null;
-
-      if (userName === 'user' && password === 'pass') {
+  const authContext = React.useMemo(
+    () => ({
+      signIn: async (userName, password) => {
+        if (userName && password) {
+          try {
+            // userToken = 'abcd';
+            // await AsyncStorage.setItem('userToken', userToken);
+            let userToken;
+            userToken = null;
+            await fetch('http://bloodbank.clonestudiobd.com/api/auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: userName,
+                password: password,
+              }),
+            }).then(response => {
+              const getStatus = response.status;
+              console.log(getStatus);
+              if (getStatus === 200) {
+                response
+                  .json()
+                  .then(async result => {
+                    console.log('token', result.access_token);
+                    dispatch({
+                      type: 'LOGIN',
+                      id: userName,
+                      token: result.access_token,
+                    });
+                    await AsyncStorage.setItem(
+                      'userToken',
+                      JSON.stringify({
+                        getToken: result.access_token,
+                      }),
+                    );
+                  })
+                  .catch(error => {
+                    console.error(error);
+                  });
+              } else {
+                Alert.alert(
+                  'Invalid email or password!',
+                  '',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        console.log('OK Pressed');
+                      },
+                    },
+                  ],
+                  {cancelable: false},
+                );
+              }
+            });
+          } catch (error) {
+            console.log(error);
+          }
+        }
+      },
+      signOut: async () => {
         try {
-          userToken = 'abcd';
-          await AsyncStorage.setItem('userToken', userToken);
+          await AsyncStorage.removeItem('userToken');
         } catch (error) {
           console.log(error);
         }
-      }
-      dispatch({type: 'LOGIN', id: userName, token: userToken});
-    },
-    signOut: async () => {
-      try {
-        userToken = await AsyncStorage.removeItem('userToken');
-      } catch (error) {
-        console.log(error);
-      }
-      dispatch({type: 'LOGOUT'});
-    },
-  }));
+        dispatch({type: 'LOGOUT'});
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     setTimeout(async () => {
